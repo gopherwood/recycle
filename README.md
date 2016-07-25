@@ -1,4 +1,4 @@
-** Recycle **
+# Recycle #
 
 This project enables simple object pooling to speed up object creation and avoid garbage collection. To use, simply include `recycle.js` in your project. Once included, it adds a `recycle` object to `window`. This object exposes a single method `add` to add recycling to an object definition. For example:
 
