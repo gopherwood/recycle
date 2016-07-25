@@ -1,0 +1,17 @@
+{
+	"name": "Recycle",
+	"version": "1.0.0",
+	"homepage": "https://github.com/gopherwood/recycle",
+	"authors": [
+		"probityrules"
+	],
+	"description": "Recycle provides an object pooling solution for arbitrary objects.",
+	"main": "src/Recycle.js",
+	"keywords": [
+		"recycle",
+		"object-pooling"
+	],
+	"license": "MIT",
+	"ignore": [
+	]
+}
