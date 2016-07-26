@@ -5,7 +5,7 @@
 	"authors": [
 		"probityrules"
 	],
-	"description": "Recycle provides an object pooling solution for arbitrary objects.",
+	"description": "Recycle provides an object pooling solution for arbitrary JavaScript objects.",
 	"main": "src/Recycle.js",
 	"keywords": [
 		"recycle",

@@ -30,7 +30,7 @@ Recyclable constructors are given two methods to manage recycling: `setUp` and `
 
     var box = new Box('big');
 
-To use a recycled `Box` or create a new instance if not are available, use the following:
+To use a recycled `Box` or create a new instance if none are available, use the following:
 
     var box = Box.setUp('big');
 
