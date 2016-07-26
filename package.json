@@ -1,6 +1,6 @@
 {
     "name": "recycle",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Recycle provides an object pooling solution for arbitrary objects.",
     "license": "MIT",
     "url": "https://github.com/gopherwood/recycle",
