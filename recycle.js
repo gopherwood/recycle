@@ -1,7 +1,5 @@
-/* global console, window */
-(function (window, Object, Array) {
-    'use strict';
-    
+/* global console */
+export default (function (Object, Array) {
     var recycleProp = {
             value: false,
             writable: true
@@ -9,7 +7,7 @@
         caches = {},
         cacheIndex = 0;
     
-    window.recycle = {
+    return {
         add: function (ClassObject, debug, name, recycle) {
             var isArray = (ClassObject === Array),
                 cache = [];
@@ -117,4 +115,4 @@
         },
         cache: caches
     };
-}(window, Object, Array));
+}(Object, Array));
