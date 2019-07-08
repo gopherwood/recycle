@@ -12,6 +12,10 @@ export default (function (Object, Array) {
             var isArray = (ClassObject === Array),
                 cache = [];
             
+            if (isArray) {
+                console.warn('Do not recommend using this utility for Array caching, due to the "don\'t modify something you don\'t own" principle.');
+            }
+
             if (name && caches[name]) {
                 console.warn('Recycle cache for "' + name + '" already exists.');
             }
@@ -63,7 +67,7 @@ export default (function (Object, Array) {
                             Object.defineProperty(newObject, 'recycled', recycleProp);
                         }
 
-                        this.apply(newObject, arguments);
+                        (this.constructor || this).apply(newObject, arguments);
 
                         return newObject;
                     } : function () {
@@ -75,7 +79,7 @@ export default (function (Object, Array) {
                             newObject = Object.create(this.prototype);
                         }
 
-                        this.apply(newObject, arguments);
+                        (this.constructor || this).apply(newObject, arguments);
 
                         return newObject;
                     }))
