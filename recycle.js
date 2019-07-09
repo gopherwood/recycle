@@ -74,7 +74,33 @@ export default (function (Object, Array) {
                 
                 Object.defineProperties(ClassObject, {
                     setUp: {
-                        value: (debug ? function () {
+                        value: (isArray ? (debug ? function () {
+                            var arr = null;
+                            
+                            if (list.length) {
+                                arr = list.pop();
+                                arr.recycled = false;
+                            } else {
+                                arr = [];
+                                Object.defineProperty(arr, 'recycled', recycleProp);
+                            }
+                            
+                            objectConstructor.apply(arr, arguments);
+
+                            return arr;
+                        } : function () {
+                            var arr = null;
+                            
+                            if (list.length) {
+                                arr = list.pop();
+                            } else {
+                                arr = [];
+                            }
+
+                            objectConstructor.apply(arr, arguments);
+
+                            return arr;
+                        }) : (debug ? function () {
                             var newObject = null;
                             
                             if (list.length) {
@@ -100,7 +126,7 @@ export default (function (Object, Array) {
                             objectConstructor.apply(newObject, arguments);
 
                             return newObject;
-                        })
+                        }))
                     },
                     recycle: {
                         value: (debug ? function (instance) {
