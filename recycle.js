@@ -40,7 +40,12 @@ export default (function (Object, Array) {
                         try {
                             ClassObject.apply(o);
                         } catch (e) {
-                            cache.objectConstructor = ClassObject.constructor;
+                            try {
+                                ClassObject.constructor.apply(o);
+                                cache.objectConstructor = ClassObject.constructor;
+                            } catch (f) {
+                                console.error('Recycle: Constructor for "' + name + '" is not functioning. ' + e.description);
+                            }
                         }
                     }
                     return cache;
