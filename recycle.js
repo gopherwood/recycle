@@ -40,10 +40,9 @@ export default (function (Object, Array) {
                         try {
                             ClassObject.apply(o);
                         } catch (e) {
-                            if (e.message.toLowerCase().indexOf('constructor') >= 0) { // It's a constructor error.
+                            // If it's a constructor error, we change to a class constructor.
+                            if (e.message.toLowerCase().indexOf('constructor') >= 0) {
                                 cache.objectConstructor = ClassObject.constructor;
-                            } else {
-                                console.error('Recycle: Constructor for "' + name + '" is not functioning: ' + e.message);
                             }
                         }
                     }
