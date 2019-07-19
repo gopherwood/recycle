@@ -1,169 +1,196 @@
 /* global console */
 export default (function (Object, Array) {
-    var populateArray = function () {
-            var i = 0;
-
-            for (i = 0; i < arguments.length; i++) {
-                this.push(arguments[i]);
-            }
-        },
-        recycleProp = {
+    var recycleProp = {
             value: false,
             writable: true
         },
         caches = {},
+        container = function () {
+            this.contains = null;
+            this.previous = null;
+        },
+        containers = null, // link-list of cached, unused containers for caches.
         recycle = {
-            createCache: function (ClassObject, name) {
-                var cache = null,
-                    o = null;
+            add: function (ClassObject, name, setUp, recycle, mixinMethods, debug) {
+                var isArray = (ClassObject === Array),
+                    cache = null;
 
                 if (!name) {
                     console.warn('Recycle: Must define a name for this cache.');
                     return null;
-                } else if (caches[name]) {
+                }
+                
+                if (caches[name]) {
                     if (ClassObject !== caches[name].ClassObject) {
                         console.warn('Recycle: There is already a cache named "' + name + '" that is being used for another object type.');
                     }
                     return caches[name];
-                } else {
-                    cache = caches[name] = {
-                        ClassObject: ClassObject,
-                        list: [],
-                        objectConstructor: ClassObject
-                    };
-
-                    // Determine whether this is a class with constructor or a factory function.
-                    if (ClassObject === Array) {
-                        cache.objectConstructor = populateArray;
-                    } else {
-                        o = Object.create(ClassObject.prototype);
-                        try {
-                            ClassObject.apply(o);
-                        } catch (e) {
-                            // If it's a constructor error, we change to a class constructor.
-                            if (e.message.toLowerCase().indexOf('constructor') >= 0) {
-                                cache.objectConstructor = ClassObject.constructor;
-                            }
-                        }
-                    }
-                    return cache;
                 }
-            },
-
-            setUp: function (name) {
-                var cache = caches[name],
-                    newObject = null;
-
-                if (!cache) {
-                    console.warn('Recycle: No cache named "' + name + '" has been defined.');
-                }
-
-                if (cache.list.length) {
-                    newObject = cache.list.pop();
-                } else {
-                    newObject = Object.create(cache.ClassObject.prototype);
-                }
-
-                cache.objectConstructor.apply(newObject, arguments);
-
-                return newObject;
-            },
-
-            add: function (ClassObject, debug, name, recycle) {
-                var isArray = (ClassObject === Array),
-                    cache = this.createCache(ClassObject, name),
-                    list = cache.list,
-                    objectConstructor = cache.objectConstructor;
                 
-                Object.defineProperties(ClassObject, {
-                    setUp: {
-                        value: (isArray ? (debug ? function () {
-                            var arr = null;
-                            
-                            if (list.length) {
-                                arr = list.pop();
-                                arr.recycled = false;
-                            } else {
-                                arr = [];
-                                Object.defineProperty(arr, 'recycled', recycleProp);
-                            }
-                            
-                            objectConstructor.apply(arr, arguments);
+                cache = caches[name] = {
+                    ClassObject: ClassObject,
+                    list: null,
+                    setUp: null,
+                    recycle: null,
+                    pop: isArray ? function () {
+                        var list = this.list,
+                            item = null;
 
-                            return arr;
-                        } : function () {
-                            var arr = null;
-                            
-                            if (list.length) {
-                                arr = list.pop();
-                            } else {
-                                arr = [];
-                            }
+                        if (list) {
+                            this.list = list.previous;
+                            item = list.contains;
+                            list.previous = containers;
+                            containers = list;
+                            return item;
+                        } else {
+                            return [];
+                        }
+                    } : function () {
+                        var list = this.list,
+                            item = null;
 
-                            objectConstructor.apply(arr, arguments);
-
-                            return arr;
-                        }) : (debug ? function () {
-                            var newObject = null;
-                            
-                            if (list.length) {
-                                newObject = list.pop();
-                                newObject.recycled = false;
-                            } else {
-                                newObject = Object.create(this.prototype);
-                                Object.defineProperty(newObject, 'recycled', recycleProp);
-                            }
-
-                            objectConstructor.apply(newObject, arguments);
-
-                            return newObject;
-                        } : function () {
-                            var newObject = null;
-                            
-                            if (list.length) {
-                                newObject = list.pop();
-                            } else {
-                                newObject = Object.create(this.prototype);
-                            }
-
-                            objectConstructor.apply(newObject, arguments);
-
-                            return newObject;
-                        }))
+                        if (list) {
+                            this.list = list.previous;
+                            item = list.contains;
+                            list.previous = containers;
+                            containers = list;
+                            return item;
+                        } else {
+                            return Object.create(this.ClassObject.prototype);
+                        }
                     },
-                    recycle: {
-                        value: (debug ? function (instance) {
-                            if (instance.recycled) {
-                                console.warn('WHOA! I have already been recycled!', instance);
-                            } else {
-                                instance.recycled = true;
-                                list.push(instance);
-                            }
-                        } : function (instance) {
-                            list.push(instance);
-                        })
+                    push: function (item) {
+                        var available = containers;
+
+                        if (available) {
+                            containers = available.previous;
+                        } else {
+                            available = Object.create(container.prototype);
+                        }
+
+                        available.previous = this.list;
+                        this.list = available;
+                        available.contains = item;
+                    },
+                    getLength: function () {
+                        var i = 0,
+                            item = this.list;
+
+                        while (item) {
+                            i += 1;
+                            item = item.previous;
+                        }
+
+                        return i;
                     }
-                });
-                Object.defineProperty(ClassObject.prototype, 'recycle', {
-                    value: recycle || (isArray ? function (depth) {
+                };
+
+                // Handle object instantiation
+                if (setUp) {
+                    cache.setUp = function () {
+                        var newObject = this.pop();
+
+                        setUp.apply(newObject, arguments);
+        
+                        return newObject;
+                    };
+                } else if (isArray) {
+                    cache.setUp = function () {
+                        var arr = this.pop(),
+                            i = 0;
+                
+                        for (i = 0; i < arguments.length; i++) {
+                            arr[i] = arguments[i];
+                        }
+
+                        return arr;
+                    };
+                } else {
+                    cache.setUp = cache.pop;
+                }
+
+                // Handle object release
+                if (recycle) {
+                    cache.recycle = function (item, ...args) {
+                        recycle.apply(item, ...args);
+                        this.push(item);
+                    };
+                } else if (isArray) {
+                    cache.recycle = function (arr, depth) {
                         var i = 0;
                         
                         if (depth > 1) {
-                            i = this.length;
+                            i = arr.length;
                             depth -= 1;
                             while (i--) {
-                                this[i].recycle(depth);
+                                this.recycle(arr[i], depth);
                             }
                         }
-                        this.length = 0;
-                        ClassObject.recycle(this);
-                    } : function () {
-                        ClassObject.recycle(this);
-                    })
-                });
-                
-                return list;
+                        arr.length = 0;
+                        this.push(arr);
+                    };
+                } else {
+                    cache.recycle = cache.push;
+                }
+
+                if (mixinMethods) {
+                    Object.defineProperties(ClassObject, {
+                        setUp: {
+                            value: (debug ? function () {
+                                var newObject = cache.setUp.apply(cache, arguments);
+    
+                                if (typeof newObject.recycled === 'undefined') {
+                                    Object.defineProperty(newObject, 'recycled', recycleProp);
+                                } else {
+                                    newObject.recycled = false;
+                                }
+        
+                                return newObject;
+                            } : cache.setUp.bind(cache))
+                        },
+                        recycle: {
+                            value: (debug ? function (instance, ...args) {
+                                if (instance.recycled) {
+                                    console.warn('WHOA! I have already been recycled!', instance);
+                                } else {
+                                    instance.recycled = true;
+                                    cache.recycle(instance, ...args);
+                                }
+                            } : cache.recycle.bind(cache))
+                        }
+                    });
+                    Object.defineProperty(ClassObject.prototype, 'recycle', {
+                        value: function (...args) {
+                            cache.recycle(this, ...args);
+                        }
+                    });
+                }
+
+                return cache;
             },
+
+            setUp: function (name, ...args) {
+                var cache = caches[name];
+
+                if (!cache) {
+                    console.warn('Recycle: No cache named "' + name + '" has been defined.');
+                    return null;
+                }
+
+                return cache.setUp(...args);
+            },
+
+            recycle: function (name, item, ...args) {
+                var cache = caches[name];
+
+                if (!cache) {
+                    console.warn('Recycle: No cache named "' + name + '" has been defined.');
+                    return;
+                }
+
+                cache.recycle(item, ...args);
+            },
+
             cache: caches
         };
 
