@@ -187,27 +187,5 @@ export default {
         return cache;
     },
 
-    setUp: function (name, ...args) {
-        var cache = caches[name];
-
-        if (!cache) {
-            console.warn('Recycle: No cache named "' + name + '" has been defined.');
-            return null;
-        }
-
-        return cache.setUp(...args);
-    },
-
-    recycle: function (name, item, ...args) {
-        var cache = caches[name];
-
-        if (!cache) {
-            console.warn('Recycle: No cache named "' + name + '" has been defined.');
-            return;
-        }
-
-        cache.recycle(item, ...args);
-    },
-
     cache: caches
 };
