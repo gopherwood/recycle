@@ -13,7 +13,7 @@ const recycleProp = {
 let containers = null; // link-list of cached, unused containers for caches.
 
 export default {
-    add: function (ClassObject, name, setUp, recycle, mixinMethods, debug) {
+    add: function (ClassObject, name, setUp, tearDown, mixinMethods, debug) {
         var isArray = (ClassObject === Array),
             cache = null;
 
@@ -112,9 +112,9 @@ export default {
         }
 
         // Handle object release
-        if (recycle) {
+        if (tearDown) {
             cache.recycle = function (item, ...args) {
-                recycle.apply(item, ...args);
+                tearDown.apply(item, ...args);
                 this.push(item);
             };
         } else if (isArray) {
@@ -135,30 +135,37 @@ export default {
             cache.recycle = cache.push;
         }
 
+        // Add debug wrapper if needed
+        if (debug) {
+            cache.setUp = function (cacheSetUp, ...args) {
+                var newObject = cacheSetUp(...args);
+
+                if (typeof newObject.recycled === 'undefined') {
+                    Object.defineProperty(newObject, 'recycled', recycleProp);
+                } else {
+                    newObject.recycled = false;
+                }
+
+                return newObject;
+            }.bind(cache, cache.setUp.bind(cache));
+
+            cache.recycle = function (recycle, instance, ...args) {
+                if (instance.recycled) {
+                    console.warn('WHOA! I have already been recycled!', instance);
+                } else {
+                    instance.recycled = true;
+                    recycle(instance, ...args);
+                }
+            }.bind(cache, cache.recycle.bind(cache));
+        }
+
         if (mixinMethods) {
             Object.defineProperties(ClassObject, {
                 setUp: {
-                    value: (debug ? function () {
-                        var newObject = cache.setUp.apply(cache, arguments);
-
-                        if (typeof newObject.recycled === 'undefined') {
-                            Object.defineProperty(newObject, 'recycled', recycleProp);
-                        } else {
-                            newObject.recycled = false;
-                        }
-
-                        return newObject;
-                    } : cache.setUp.bind(cache))
+                    value: cache.setUp.bind(cache)
                 },
                 recycle: {
-                    value: (debug ? function (instance, ...args) {
-                        if (instance.recycled) {
-                            console.warn('WHOA! I have already been recycled!', instance);
-                        } else {
-                            instance.recycled = true;
-                            cache.recycle(instance, ...args);
-                        }
-                    } : cache.recycle.bind(cache))
+                    value: cache.recycle.bind(cache)
                 }
             });
             Object.defineProperty(ClassObject.prototype, 'recycle', {
