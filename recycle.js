@@ -5,7 +5,7 @@ export default (function (Object, Array) {
             writable: true
         },
         caches = {},
-        container = function () {
+        Container = function () {
             this.contains = null;
             this.previous = null;
         },
@@ -65,7 +65,7 @@ export default (function (Object, Array) {
                         if (available) {
                             containers = available.previous;
                         } else {
-                            available = Object.create(container.prototype);
+                            available = Object.create(Container.prototype);
                         }
 
                         available.previous = this.list;
