@@ -151,12 +151,21 @@ export default {
 
             cache.recycle = function (recycle, instance, ...args) {
                 if (instance.recycled) {
-                    console.warn('WHOA! I have already been recycled!', instance);
+                    console.warn('Recycle: WHOA! I have already been recycled!', instance);
                 } else {
                     instance.recycled = true;
                     recycle(instance, ...args);
                 }
             }.bind(cache, cache.recycle.bind(cache));
+
+            if (isArray) {
+                cache.recycle = function (recycle, instance, ...args) {
+                    if (!Array.isArray(instance)) {
+                        console.warn('Recycle: Adding a non-Array to the array cache!');
+                    }
+                    recycle(instance, ...args);
+                }.bind(cache, cache.recycle.bind(cache));
+            }
         }
 
         if (mixinMethods) {
