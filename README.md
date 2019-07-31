@@ -1,4 +1,4 @@
-# Recycle #
+# ♻️ Recycle #
 
 This project enables simple object pooling to speed up object creation and reduce garbage collection. To use, simply include `recycle.js` in your project.
 
