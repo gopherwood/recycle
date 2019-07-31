@@ -2,14 +2,18 @@
 
 This project enables simple object pooling to speed up object creation and reduce garbage collection. To use, simply include `recycle.js` in your project.
 
-    include recycle from 'recycle.js';
+```js
+include recycle from 'recycle.js';
+```
 
 The `recycle` object exposes an `add` method to add recycling to an object definition. For example:
 
-    const Box = function (size) {
-            this.size = size;
-        },
-        boxCache = recycle.add(Box, 'Box');
+```js
+const Box = function (size) {
+        this.size = size;
+    },
+    boxCache = recycle.add(Box, 'Box');
+```
 
 Now `Box` objects will be recyclable. For more control, you can specify additional parameters as follows:
 
@@ -24,59 +28,73 @@ The `add` method returns a cache object that exposes a `setUp` method for gettin
 
 For the above example, we might do:
 
-    const Box = function (size) {
-            this.size = size;
-        },
-        boxCache = recycle.add(Box, 'Box', Box, function () {
-            this.size = '';
-        }, true, true);
+```js
+const Box = function (size) {
+        this.size = size;
+    },
+    boxCache = recycle.add(Box, 'Box', Box, function () {
+        this.size = '';
+    }, true, true);
+```
 
 When `mixinMethods` is set to `true`, recyclable objects are given two methods to manage recycling: `setUp` and `recycle`. Additionally, a `recycle` method is added to the object's prototype for easy reference.
 
 So, for example, instead of using:
 
-    const box = new Box('big');
+```js
+const box = new Box('big');
+```
 
 To use a recycled `Box` or create a new instance if none are available, use any of the following:
 
-    // Get a new Box from `recycle`
-    const box = recycle.cache['Box'].setUp('small');
-    
-    // Get a new Box from local cache reference
-    const box = boxCache.setUp('small');
+```js
+// Get a new Box from `recycle`
+const box = recycle.cache['Box'].setUp('small');
 
-    // If `mixinMethods` is `true`, use the class object itself
-    const box = Box.setUp('small');
+// Get a new Box from local cache reference
+const box = boxCache.setUp('small');
+
+// If `mixinMethods` is `true`, use the class object itself
+const box = Box.setUp('small');
+```
 
 And then once it's no longer needed, it can be returned to the cache using any of the following:
 
-    // Recycle from the `recycle` object
-    recycle.cache['Box'].recycle(box);
+```js
+// Recycle from the `recycle` object
+recycle.cache['Box'].recycle(box);
 
-    // Recycle from local cache reference
-    boxCache.recycle(box);
+// Recycle from local cache reference
+boxCache.recycle(box);
 
-    // If `mixinMethods` is `true`, use either of the following
-    box.recycle();
-    // or
-    Box.recycle(box);
+// If `mixinMethods` is `true`, use either of the following
+box.recycle();
+// or
+Box.recycle(box);
+```
 
 Finally, if you are storing a reference to a recycled object, as a property for example, be sure to set the property to `null` to prevent accidentally using it later. For example:
 
-    // Getting a box to use
-    this.box = Box.setUp('big');
+```js
+// Getting a box to use
+this.box = Box.setUp('big');
 
-    // No longer need the box
-    this.box.recycle();
-    this.box = null;
+// No longer need the box
+this.box.recycle();
+this.box = null;
+```
 
 If Array is added to the recycling system (without a custom tear-down function), it accepts a parameter to recycle multiple dimensions. So, for example, a two-dimensional array set up like:
 
-    const arrayCache = recycle.add(Array, 'Array'),
-        arr = arrayCache.setUp(arrayCache.setUp(), arrayCache.setUp());
+```js
+const arrayCache = recycle.add(Array, 'Array'),
+    arr = arrayCache.setUp(arrayCache.setUp(), arrayCache.setUp());
+```
 
 Can be fully recycled by passing its dimensions into the `recycle` method:
 
-    arr.recycle(2)
+```js
+arr.recycle(2);
+```
 
 Objects currently in use are not referenceable from the recycling system, but all unused cached objects are accessible from `recycle.cache`.
