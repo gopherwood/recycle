@@ -3,7 +3,7 @@
 This project enables simple object pooling to speed up object creation and reduce garbage collection. To use, simply include `recycle.js` in your project.
 
 ```js
-include recycle from 'recycle.js';
+import recycle from 'recycle.js';
 ```
 
 The `recycle` object exposes an `add` method to add recycling to an object definition. For example:
