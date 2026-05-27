@@ -195,17 +195,77 @@ export default {
         }
 
         if (mixinMethods) {
+            // Shared recycle logic used by both the static and prototype methods
+            // so retain/deferred-recycle behaviour is consistent regardless of
+            // which call form the caller uses (Box.recycle(b) or b.recycle()).
+            const recycleWithHold = function (...args) {
+                if (this.holds > 0) {
+                    this.recyclePending = args;
+                } else {
+                    cache.recycle(this, ...args);
+                }
+            };
+
+            // Shared recycleHold/recycleRelease logic likewise kept in one place.
+            // recycleHold() and recycleRelease() operate on the instance they are called on.
+            // As static methods they receive the instance as the first argument;
+            // as prototype methods `this` is the instance directly.
+            const recycleHoldInstance = function (instance) {
+                instance.holds = (instance.holds || 0) + 1;
+                return instance;
+            };
+
+            const recycleReleaseInstance = function (instance) {
+                instance.holds = Math.max((instance.holds || 0) - 1, 0);
+
+                if (instance.holds === 0) {
+                    const { recyclePending } = instance;
+
+                    // Use != null to catch both null and undefined,
+                    // since recyclePending is never explicitly initialised.
+                    if (recyclePending != null) {
+                        instance.recyclePending = null;
+                        recycleWithHold.call(instance, ...recyclePending);
+                    }
+                }
+                return instance;
+            };
+
             Object.defineProperties(ClassObject, {
+                recycleHold: {
+                    value: recycleHoldInstance
+                },
+                recycleRelease: {
+                    value: recycleReleaseInstance
+                },
                 setUp: {
                     value: cache.setUp.bind(cache)
                 },
                 recycle: {
-                    value: cache.recycle.bind(cache)
+                    value: function (instance, ...args) {
+                        recycleWithHold.call(instance, ...args);
+                    }
                 }
             });
-            Object.defineProperty(ClassObject.prototype, 'recycle', {
-                value: function (...args) {
-                    cache.recycle(this, ...args);
+
+            // Prototype versions: `this` is the instance, so we adapt the
+            // shared helpers accordingly. Prototype recycle mirrors the static
+            // version so instance.recycle() and Box.recycle(instance) are identical.
+            Object.defineProperties(ClassObject.prototype, {
+                recycleHold: {
+                    value: function () {
+                        return recycleHoldInstance(this);
+                    }
+                },
+                recycleRelease: {
+                    value: function () {
+                        return recycleReleaseInstance(this);
+                    }
+                },
+                recycle: {
+                    value: function (...args) {
+                        recycleWithHold.call(this, ...args);
+                    }
                 }
             });
         }

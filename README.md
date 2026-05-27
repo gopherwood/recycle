@@ -32,7 +32,7 @@ Now `Box` objects will be recyclable. For more control, you can specify addition
 2. **name** (String, required) - The name of the object type. This maintains a key reference in `recycle.cache` containing all unused, cached objects.
 3. **setUp** (Function, optional) - An initialization method that should be called when a new instance is created if there is any object set-up involved. For factory functions, this could just be the constructor itself.
 4. **tearDown** (Function, optional) - A tear-down method that should be called when an instance is recycled. This is a good place to `null` or `0` out properties before storing in cache for re-use later.
-5. **mixinMethods** (Boolean, optional) - By default, this is `false`, but set to `true` to add static `setUp` and `recycle` methods to the recyclable object, and a `recycle` method to the recyclable object's prototype. This makes set-up and recycling more convenient, but be a good neighbor and do not set this to `true` for objects you don't control (for example, `Array`) as it *may* conflict with pre-existing methods.
+5. **mixinMethods** (Boolean, optional) - By default, this is `false`, but set to `true` to add static `setUp`, `recycle`, `recycleHold`, and `recycleRelease` methods to the recyclable object, and `recycle`, `recycleHold`, and `recycleRelease` methods to the recyclable object's prototype. This makes set-up and recycling more convenient, but be a good neighbor and do not set this to `true` for objects you don't control (for example, `Array`) as it *may* conflict with pre-existing methods.
 6. **debug** (Boolean, optional) - Sets whether to log recycling issues to the console. For example, if an object is recycled twice, there may be issues. This is slower, but highly recommended to be used during development.
 
 The `add` method returns a cache object that exposes a `setUp` method for getting a new object and a `recycle` method for returning an object to this cache. This same cache object is available at `recycle.cache[name]`.
@@ -94,6 +94,27 @@ this.box = Box.setUp('big');
 this.box.recycle();
 this.box = null;
 ```
+
+## recycleHold and recycleRelease: Deferred Recycling ##
+
+When `mixinMethods` is `true`, objects also receive `recycleHold` and `recycleRelease` methods. These are useful when an object is referenced in multiple places and you want to ensure it isn't recycled until all holders are done with it.
+
+Calling `recycleHold` increments an internal counter. Calling `recycle` while the hold count is greater than zero defers the recycle rather than executing it immediately. Calling `recycleRelease` decrements the counter, and once it reaches zero the pending recycle is flushed automatically.
+
+```js
+// Two systems both need the box
+Box.recycleHold(box);   // or box.recycleHold()
+Box.recycleHold(box);   // holds = 2
+
+// First system is done — recycle is deferred, not immediate
+Box.recycle(box);
+
+// Second system is done — holds reaches 0, recycle flushes now
+Box.recycleRelease(box);   // or box.recycleRelease()
+Box.recycleRelease(box);
+```
+
+If `recycleRelease` is called with no pending recycle it is a safe no-op, and the hold count will never go below zero.
 
 If Array is added to the recycling system (without a custom tear-down function), it accepts a parameter to recycle multiple dimensions. So, for example, a two-dimensional array set up like:
 

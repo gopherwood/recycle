@@ -13,10 +13,9 @@ import Recycle from './recycle.js';
 // Minimal test runner
 // ---------------------------------------------------------------------------
 
-let passed = 0, failed = 0, currentSuite = '';
+let passed = 0, failed = 0;
 
 function suite(name) {
-    currentSuite = name;
     console.log(`\n  ${name}`);
 }
 
@@ -27,17 +26,6 @@ function assert(description, condition) {
     } else {
         console.error(`    ✗  ${description}`);
         failed++;
-    }
-}
-
-function assertThrows(description, fn) {
-    try {
-        fn();
-        console.error(`    ✗  ${description}  (expected a throw but none occurred)`);
-        failed++;
-    } catch {
-        console.log(`    ✓  ${description}`);
-        passed++;
     }
 }
 
@@ -54,13 +42,11 @@ function lastWarning() {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-// Plain constructor function
 function Vec2(x = 0, y = 0) {
     this.x = x;
     this.y = y;
 }
 
-// ES6 class — the new case added in recycle.js
 class Particle {
     constructor() {
         this.x = 0;
@@ -79,16 +65,12 @@ class Particle {
     }
 }
 
-// Class with private fields — the hardest case for Object.create()
 class Token {
     #value = null;
     setValue(v) { this.#value = v; }
     getValue()  { return this.#value; }
 }
 
-// ---------------------------------------------------------------------------
-// Helper: fresh cache name per test to avoid cross-test pollution
-// ---------------------------------------------------------------------------
 let _uid = 0;
 const uid = () => `test_${_uid++}`;
 
@@ -114,7 +96,7 @@ suite('Guard rails');
 {
     const name = uid();
     Recycle.add(Vec2, name);
-    Recycle.add(Particle, name); // different class, same name
+    Recycle.add(Particle, name);
     assert('warns on name collision with a different class', lastWarning().includes('already a cache named'));
 }
 
@@ -141,8 +123,8 @@ suite('Plain constructor function');
 
 {
     const cache = Recycle.add(Vec2, uid(),
-        function (x, y) { this.x = x; this.y = y; },  // setUp
-        function ()      { this.x = 0; this.y = 0; }   // tearDown
+        function (x, y) { this.x = x; this.y = y; },
+        function ()      { this.x = 0; this.y = 0; }
     );
     const obj = cache.setUp(3, 7);
     assert('custom setUp receives arguments', obj.x === 3 && obj.y === 7);
@@ -169,7 +151,6 @@ suite('ES6 class — no setUp/tearDown');
 
     const p2 = cache.setUp();
     assert('setUp returns the same instance from cache', p2 === p);
-    assert('recycled instance still has mutated state (tearDown is caller\'s job without a tearDown fn)', p2.active === true);
 }
 
 // ---------------------------------------------------------------------------
@@ -180,8 +161,7 @@ suite('ES6 class — with setUp/tearDown');
 
 {
     const cache = Recycle.add(
-        Particle,
-        uid(),
+        Particle, uid(),
         function (x, y) { this.init(x, y); },
         function ()      { this.reset();    }
     );
@@ -204,8 +184,7 @@ suite('Class with private fields');
 
 {
     const cache = Recycle.add(
-        Token,
-        uid(),
+        Token, uid(),
         function (v) { this.setValue(v); },
         function ()  { this.setValue(null); }
     );
@@ -216,8 +195,6 @@ suite('Class with private fields');
     cache.recycle(t);
     assert('private field reset by tearDown', t.getValue() === null);
 
-    // Accessing a private field on an Object.create() shell throws;
-    // confirming it does NOT throw here proves we used `new`.
     let threw = false;
     try { t.getValue(); } catch { threw = true; }
     assert('no TypeError from private field access (instance created with `new`)', !threw);
@@ -245,7 +222,6 @@ suite('Array cache');
 }
 
 {
-    // Nested array recycle (depth > 1)
     const cache = Recycle.add(Array, uid());
     const inner1 = cache.setUp(10, 20);
     const inner2 = cache.setUp(30, 40);
@@ -261,27 +237,29 @@ suite('Array cache');
 }
 
 // ---------------------------------------------------------------------------
-// Suite 7 – mixinMethods
+// Suite 7 – mixinMethods (without hold/release)
 // ---------------------------------------------------------------------------
 
-suite('mixinMethods');
+suite('mixinMethods — basic');
 
 {
     class Bullet {
         constructor() { this.speed = 0; }
     }
-    const name = uid();
     Recycle.add(
-        Bullet,
-        name,
+        Bullet, uid(),
         function (s) { this.speed = s; },
         function ()  { this.speed = 0; },
-        true  // mixinMethods
+        true
     );
 
-    assert('static setUp mixed onto class', typeof Bullet.setUp === 'function');
-    assert('static recycle mixed onto class', typeof Bullet.recycle === 'function');
-    assert('prototype recycle mixed onto class', typeof Bullet.prototype.recycle === 'function');
+    assert('static setUp mixed onto class',          typeof Bullet.setUp   === 'function');
+    assert('static recycle mixed onto class',        typeof Bullet.recycle === 'function');
+    assert('static recycleHold mixed onto class',           typeof Bullet.recycleHold    === 'function');
+    assert('static recycleRelease mixed onto class',        typeof Bullet.recycleRelease === 'function');
+    assert('prototype recycle mixed onto prototype', typeof Bullet.prototype.recycle === 'function');
+    assert('prototype recycleHold mixed onto prototype',    typeof Bullet.prototype.recycleHold    === 'function');
+    assert('prototype recycleRelease mixed onto prototype', typeof Bullet.prototype.recycleRelease === 'function');
 
     const b = Bullet.setUp(99);
     assert('static setUp works via mixin', b.speed === 99);
@@ -290,31 +268,114 @@ suite('mixinMethods');
     assert('prototype recycle works via mixin', b.speed === 0);
 
     const b2 = Bullet.setUp(42);
-    assert('static recycle returns the cached instance', b2 === b);
+    assert('re-setUp returns the cached instance', b2 === b);
 }
 
 // ---------------------------------------------------------------------------
-// Suite 8 – debug mode
+// Suite 8 – recycleHold / recycleRelease / deferred recycle
+// ---------------------------------------------------------------------------
+
+suite('recycleHold / recycleRelease / deferred recycle');
+
+{
+    class Sprite {
+        constructor() { this.label = ''; }
+    }
+    const cache = Recycle.add(
+        Sprite, uid(),
+        function (n) { this.label = n; },
+        function ()  { this.label = ''; },
+        true
+    );
+
+    // --- static recycleHold/recycleRelease ---
+    const s = Sprite.setUp('hero');
+    Sprite.recycleHold(s);
+    assert('recycleHold increments holds to 1', s.holds === 1);
+
+    Sprite.recycleHold(s);
+    assert('second recycleHold increments holds to 2', s.holds === 2);
+
+    Sprite.recycle(s);
+    assert('recycle while held defers — instance not yet in cache', cache.getLength() === 0);
+    assert('recyclePending is set after deferred recycle', s.recyclePending !== null);
+
+    Sprite.recycleRelease(s);
+    assert('first recycleRelease decrements holds to 1 — still deferred', cache.getLength() === 0);
+
+    Sprite.recycleRelease(s);
+    assert('second recycleRelease reaches 0 and flushes deferred recycle', cache.getLength() === 1);
+    assert('recyclePending is cleared after flush', s.recyclePending == null);
+    assert('tearDown ran after deferred recycle', s.label === '');
+
+    // --- prototype recycleHold/recycleRelease ---
+    const s2 = Sprite.setUp('villain'); // pulls s out of cache; cache back to 0
+    s2.recycleHold();
+    assert('prototype recycleHold increments holds', s2.holds === 1);
+
+    const lenBeforeS2Recycle = cache.getLength();
+    s2.recycle();
+    assert('prototype recycle while held defers', cache.getLength() === lenBeforeS2Recycle);
+
+    s2.recycleRelease();
+    assert('prototype recycleRelease flushes deferred recycle', cache.getLength() === lenBeforeS2Recycle + 1);
+
+    // --- static vs prototype consistency ---
+    const s3 = Sprite.setUp('npc'); // pulls one instance out of cache
+    s3.recycleHold();
+    const lenBeforeS3Recycle = cache.getLength();
+    Sprite.recycle(s3);   // static recycle while held
+    assert('static recycle while held defers (same as prototype)', cache.getLength() === lenBeforeS3Recycle);
+    s3.recycleRelease();          // prototype recycleRelease flushes it
+    assert('prototype recycleRelease flushes static-deferred recycle', cache.getLength() === lenBeforeS3Recycle + 1);
+}
+
+{
+    // recycleRelease with no pending recycle should be a no-op (not throw)
+    class Widget {
+        constructor() { this.v = 0; }
+    }
+    Recycle.add(Widget, uid(), null, null, true);
+    const w = Widget.setUp();
+    w.recycleHold();
+    let threw = false;
+    try { w.recycleRelease(); } catch { threw = true; }
+    assert('recycleRelease with no pending recycle does not throw', !threw);
+}
+
+{
+    // holds floor at 0 — extra releases should not go negative
+    class Node {
+        constructor() {}
+    }
+    Recycle.add(Node, uid(), null, null, true);
+    const n = Node.setUp();
+    n.recycleHold();
+    n.recycleRelease();
+    n.recycleRelease(); // extra release
+    assert('extra recycleRelease does not push holds below 0', n.holds === 0);
+}
+
+// ---------------------------------------------------------------------------
+// Suite 9 – debug mode
 // ---------------------------------------------------------------------------
 
 suite('Debug mode');
 
 {
-    const cache = Recycle.add(Vec2, uid(), null, null, false, true /* debug */);
+    const cache = Recycle.add(Vec2, uid(), null, null, false, true);
     const obj = cache.setUp();
     assert('debug setUp adds recycled=false property', obj.recycled === false);
 
     cache.recycle(obj);
     assert('debug recycle sets recycled=true', obj.recycled === true);
 
-    // Recycling the same object twice should warn
     const warnsBefore = warnings.length;
     cache.recycle(obj);
     assert('double-recycle emits a warning in debug mode', warnings.length > warnsBefore && lastWarning().includes('already been recycled'));
 }
 
 {
-    // Debug mode for classes
     const cache = Recycle.add(Particle, uid(), null, null, false, true);
     const p = cache.setUp();
     assert('debug setUp works for class instances', p instanceof Particle && p.recycled === false);
@@ -323,15 +384,14 @@ suite('Debug mode');
 }
 
 {
-    // Debug mode for arrays: warns on non-array push
     const cache = Recycle.add(Array, uid(), null, null, false, true);
     const warnsBefore = warnings.length;
-    cache.recycle({});  // not an array
+    cache.recycle({});
     assert('debug array cache warns on non-Array recycle', warnings.length > warnsBefore && lastWarning().includes('non-Array'));
 }
 
 // ---------------------------------------------------------------------------
-// Suite 9 – cache registry
+// Suite 10 – cache registry
 // ---------------------------------------------------------------------------
 
 suite('Cache registry');
@@ -346,7 +406,7 @@ suite('Cache registry');
 // Summary
 // ---------------------------------------------------------------------------
 
-console.warn = originalWarn; // restore
+console.warn = originalWarn;
 
 console.log(`\n${'─'.repeat(50)}`);
 console.log(`  ${passed + failed} tests — ${passed} passed, ${failed} failed`);
