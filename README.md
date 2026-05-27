@@ -15,6 +15,17 @@ const Box = function (size) {
     boxCache = recycle.add(Box, 'Box');
 ```
 
+Or for ES6 classes:
+
+```js
+const Box = class {
+        constructor (size) {
+            this.size = size;
+        }
+    },
+    boxCache = recycle.add(Box, 'Box');
+```
+
 Now `Box` objects will be recyclable. For more control, you can specify additional parameters as follows:
 
 1. **ClassObject** (Object, required) - Object definition to add recycling to. (`Box` above.)

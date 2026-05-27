@@ -1,6 +1,15 @@
 /* global Array, console, Object */
 
-const recycleProp = {
+const
+    /**
+     * Returns true if the given function is an ES6 class definition.
+     * Relies on the spec requirement that Function.prototype.toString()
+     * returns the original source text, so class definitions always
+     * begin with the "class" keyword.
+     */
+    isClassDefinition = fn => /^\s*class[\s{]/.test(fn.toString()),
+
+    recycleProp = {
         value: false,
         writable: true
     },
@@ -15,6 +24,7 @@ let containers = null; // link-list of cached, unused containers for caches.
 export default {
     add: function (ClassObject, name, setUp, tearDown, mixinMethods, debug) {
         var isArray = (ClassObject === Array),
+            isClass = !isArray && isClassDefinition(ClassObject),
             cache = null;
 
         if (!name) {
@@ -46,6 +56,22 @@ export default {
                     return item;
                 } else {
                     return [];
+                }
+            } : isClass ? function () {
+                // Classes cannot be invoked without `new`, and Object.create()
+                // skips the constructor (breaking private fields and required
+                // initialization), so we use `new` for the cold-cache path.
+                var list = this.list,
+                    item = null;
+
+                if (list) {
+                    this.list = list.previous;
+                    item = list.contains;
+                    list.previous = containers;
+                    containers = list;
+                    return item;
+                } else {
+                    return new this.ClassObject();
                 }
             } : function () {
                 var list = this.list,

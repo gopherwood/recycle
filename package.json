@@ -1,12 +1,16 @@
 {
     "name": "recycle",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "Recycle provides an object pooling solution for arbitrary objects.",
     "main": "recycle.js",
+    "type": "module",
     "license": "MIT",
     "url": "https://github.com/gopherwood/recycle",
     "repository": {
         "type": "git",
         "url": "https://github.com/gopherwood/recycle"
+    },
+    "scripts": {
+        "test": "node recycle.test.mjs"
     }
 }
