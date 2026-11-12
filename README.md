@@ -4,6 +4,18 @@ This project enables simple object pooling to speed up object creation and reduc
 
 ```js
 import recycle from 'recycle.js';
+
+const Box = function (size) {
+    this.size = size;
+};
+
+const boxCache = recycle.add(Box, 'Box', Box, function () {
+    this.size = '';
+}, true);
+
+const box = Box.setUp('small');
+// ... use box ...
+box.recycle();
 ```
 
 The `recycle` object exposes an `add` method to add recycling to an object definition. For example:
